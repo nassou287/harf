@@ -7,7 +7,7 @@
  *   Leurs noms changent à chaque nouvelle version, donc pas de risque de version périmée.
  * Les données de progression ne passent JAMAIS par ici : elles restent dans le stockage local.
  */
-const CACHE = 'harf-v1'
+const CACHE = 'harf-v3'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './manifest.webmanifest'])))
