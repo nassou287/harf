@@ -1,26 +1,66 @@
 /*
- * Service worker de Harf : rend l'application utilisable hors connexion.
+ * Service worker de Harf : hors connexion + mises à jour maîtrisées.
  *
- * Stratégie volontairement simple :
- * - pages HTML : réseau d'abord (pour recevoir les mises à jour), cache si hors ligne ;
- * - fichiers de l'application (JS, CSS, polices, images, audio) : cache d'abord.
- *   Leurs noms changent à chaque nouvelle version, donc pas de risque de version périmée.
- * Les données de progression ne passent JAMAIS par ici : elles restent dans le stockage local.
+ * Ce fichier est un MODÈLE : à la construction (vite build), la ligne `self.__HARF__ = …`
+ * est remplie avec le numéro de version et la liste exacte des fichiers de cette version.
+ *
+ * Stratégie :
+ * 1. Installation : TOUS les fichiers de la version sont téléchargés dans un cache propre à
+ *    cette version (harf-app-<build>). Si un seul échoue (pas de connexion…), l'installation
+ *    échoue et l'ancienne version continue de fonctionner normalement : rien n'est cassé.
+ * 2. Attente : la nouvelle version NE s'active PAS toute seule pendant que Harf est ouvert
+ *    (pas de skipWaiting automatique). L'application propose « Mettre à jour » au bon moment.
+ * 3. Activation : uniquement quand l'apprenant accepte (message SKIP_WAITING), ou quand
+ *    Harf a été complètement fermé. Alors seulement, les caches des anciennes versions sont
+ *    supprimés.
+ * 4. Pendant l'utilisation, chaque page reçoit uniquement les fichiers de SA version :
+ *    jamais de mélange entre ancien et nouveau JavaScript/CSS.
+ *
+ * Les données pédagogiques (progression, profils, copies de secours) sont dans le stockage
+ * local et IndexedDB : ce fichier n'y touche JAMAIS. Le nettoyage ne concerne que les caches
+ * de fichiers dont le nom commence par « harf- ».
  */
-const CACHE = 'harf-v17'
+self.__HARF__ = {"version":"0.18.0","build":"0.18.0-mwrk1jd0","files":["apple-touch-icon.png","assets/alif-B22IWrb0.wav","assets/ayn-BBiEkaJ-.mp3","assets/ba-CJsmFjcc.wav","assets/cormorant-garamond-latin-600-normal-Co1r35X9.woff2","assets/dad-DOSPfHSo.mp3","assets/dal-Bh0mLPIE.mp3","assets/dhal-mk0Ke2Ey.mp3","assets/fa-DQc3MdYY.mp3","assets/ghayn-CXDZEjvj.mp3","assets/ha-CbkDwy3s.mp3","assets/haa-DTmeXhJV.mp3","assets/index-CPKb3TH0.js","assets/index-CgFKof-l.css","assets/jim-CrKBNtVw.mp3","assets/kaf-DfYC6mSB.mp3","assets/kha-CWumo62T.mp3","assets/lam-xS6hix2k.mp3","assets/mim-DrN2P9Q4.mp3","assets/noto-naskh-arabic-arabic-400-normal-U_i0HMfG.woff2","assets/noto-naskh-arabic-arabic-700-normal-BdBAMxnO.woff2","assets/noto-naskh-arabic-latin-400-normal-Dajb6q3W.woff2","assets/noto-naskh-arabic-latin-700-normal-CG_vrPqD.woff2","assets/noto-naskh-arabic-latin-ext-400-normal-BbeOg8Tq.woff2","assets/noto-naskh-arabic-latin-ext-700-normal-BdpHOyev.woff2","assets/noto-naskh-arabic-math-400-normal-tNY49amj.woff2","assets/noto-naskh-arabic-math-700-normal-BP-LajJh.woff2","assets/noto-naskh-arabic-symbols-400-normal-BoBMuTRv.woff2","assets/noto-naskh-arabic-symbols-700-normal-s-Hxeun5.woff2","assets/nun-DPYc62QI.mp3","assets/qaf-DtSlw4g_.mp3","assets/ra-CztltUos.mp3","assets/sad-BuqEqVcO.mp3","assets/shin-Dp-5DOc9.mp3","assets/sin-DCB9i_Gz.mp3","assets/ta-CZP17wwQ.wav","assets/taa-DoU55Xns.mp3","assets/tha-BgoILA0a.mp3","assets/waw-615TVa3Y.mp3","assets/ya-xoTywaRH.mp3","assets/zaa-jPbeMTRA.mp3","assets/zay-v3wrfWMc.mp3","icon-192.png","icon-512.png","icon-maskable-512.png","index.html","manifest.webmanifest"]} // remplacé à la construction
+
+const { version: VERSION, build: BUILD, files: FILES } = self.__HARF__
+const CACHE = `harf-app-${BUILD}`
+const scoped = (path) => new URL(path, self.registration.scope).href
+/** Fichiers dont le nom contient une empreinte : identiques d'une version à l'autre si inchangés. */
+const isHashed = (path) => /-[A-Za-z0-9_-]{8}\.[a-z0-9]+$/.test(path)
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['./', './manifest.webmanifest'])))
-  self.skipWaiting()
+  event.waitUntil(
+    (async () => {
+      const cache = await caches.open(CACHE)
+      for (const path of FILES) {
+        const url = scoped(path)
+        if (await cache.match(url)) continue
+        // Un fichier à empreinte déjà téléchargé par une version précédente est réutilisé : pas de
+        // téléchargement inutile. Les autres (index.html, icônes…) sont toujours pris à jour.
+        const old = isHashed(path) ? await caches.match(url) : undefined
+        const res = old ?? (await fetch(new Request(url, { cache: 'reload' })))
+        if (!res.ok) throw new Error(`Téléchargement impossible : ${path} (${res.status})`)
+        await cache.put(url, res.clone())
+      }
+    })(),
+  )
 })
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim()),
+    (async () => {
+      const names = await caches.keys()
+      // Uniquement nos caches de fichiers, jamais autre chose.
+      await Promise.all(names.filter((n) => n.startsWith('harf-') && n !== CACHE).map((n) => caches.delete(n)))
+      await self.clients.claim()
+    })(),
   )
+})
+
+self.addEventListener('message', (event) => {
+  const msg = event.data || {}
+  if (msg.type === 'SKIP_WAITING') self.skipWaiting()
+  if (msg.type === 'GET_VERSION' && event.ports[0]) event.ports[0].postMessage({ version: VERSION, build: BUILD })
 })
 
 self.addEventListener('fetch', (event) => {
@@ -28,29 +68,24 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return
 
   if (req.mode === 'navigate') {
+    // La page vient de la version installée : elle correspond exactement à ses fichiers.
     event.respondWith(
-      fetch(req)
-        .then((res) => {
-          const copy = res.clone()
-          caches.open(CACHE).then((c) => c.put('./', copy))
-          return res
-        })
-        .catch(() => caches.match('./')),
+      (async () => {
+        const cache = await caches.open(CACHE)
+        return (await cache.match(scoped('index.html'))) ?? fetch(req).catch(() => caches.match(scoped('index.html')))
+      })(),
     )
     return
   }
 
   event.respondWith(
-    caches.match(req).then(
-      (hit) =>
-        hit ||
-        fetch(req).then((res) => {
-          if (res.ok) {
-            const copy = res.clone()
-            caches.open(CACHE).then((c) => c.put(req, copy))
-          }
-          return res
-        }),
-    ),
+    (async () => {
+      const cache = await caches.open(CACHE)
+      const hit = (await cache.match(req, { ignoreSearch: true })) ?? (await caches.match(req, { ignoreSearch: true }))
+      if (hit) return hit
+      const res = await fetch(req)
+      if (res.ok && res.type === 'basic') await cache.put(req, res.clone())
+      return res
+    })(),
   )
 })
