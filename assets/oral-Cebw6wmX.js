@@ -1,0 +1,1 @@
+var e=e=>e.oral??{};function t(t,n,r,i,a){let o=e(t)[n];return{...t,oral:{...e(t),[n]:{n:(o?.n??0)+1,last:r,at:a,kind:i}}}}export{t as n,e as t};
