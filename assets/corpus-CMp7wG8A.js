@@ -1,4 +1,4 @@
-import{B as e,ct as t,dt as n,ht as r,mt as i,pt as a,ut as o}from"./index-ATM_VRmT.js";var s=`# PLEASE DO NOT REMOVE OR CHANGE THIS COPYRIGHT BLOCK
+import{B as e,ct as t,dt as n,ht as r,mt as i,pt as a,ut as o}from"./index-CBzTs9NQ.js";var s=`# PLEASE DO NOT REMOVE OR CHANGE THIS COPYRIGHT BLOCK
 #====================================================================
 #
 #  Tanzil Quran Text (Uthmani, Version 1.1)
