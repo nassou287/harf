@@ -1,4 +1,4 @@
-import{n as e}from"./rolldown-runtime-4tVxZq34.js";import{a as t,d as n,l as r,n as i,s as a,t as o,u as s}from"./audio-measures-u9O4D7Sl.js";var c=`# PLEASE DO NOT REMOVE OR CHANGE THIS COPYRIGHT BLOCK
+import{n as e}from"./rolldown-runtime-4tVxZq34.js";import{a as t,d as n,l as r,n as i,s as a,t as o,u as s}from"./audio-measures-lk-RYAjy.js";var c=`# PLEASE DO NOT REMOVE OR CHANGE THIS COPYRIGHT BLOCK
 #====================================================================
 #
 #  Tanzil Quran Text (Uthmani, Version 1.1)
