@@ -1,0 +1,1 @@
+var e=[{id:`g-110`,surah:110,goal:`Trois versets courts`},{id:`g-106`,surah:106,goal:`Quatre versets courts`},{id:`g-109`,surah:109,goal:`Six versets aux phrases qui se répondent`},{id:`g-111`,surah:111,goal:`Cinq versets`},{id:`g-105`,surah:105,goal:`Cinq versets`},{id:`g-107`,surah:107,goal:`Sept versets courts`}],t=t=>e.find(e=>e.id===t);export{t as n,e as t};
